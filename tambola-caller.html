@@ -1,0 +1,683 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,maximum-scale=1,user-scalable=no">
+<title>Tambola Caller</title>
+<link href="https://fonts.googleapis.com/css2?family=Orbitron:wght@400;700;900&family=Barlow:wght@400;500;600&family=Barlow+Condensed:wght@600;700&display=swap" rel="stylesheet">
+<style>
+/* ── reset ──────────────────────────────────────────── */
+*,*::before,*::after{box-sizing:border-box;margin:0;padding:0;-webkit-tap-highlight-color:transparent}
+html{height:100%}
+body{
+  min-height:100%;background:#080b12;
+  font-family:'Barlow',sans-serif;color:#e8eeff;
+  overflow-x:hidden;
+}
+
+/* ── tokens ─────────────────────────────────────────── */
+:root{
+  --red:#ff2235;--red2:rgba(255,34,53,0.18);--red3:rgba(255,34,53,0.06);
+  --gold:#ffc840;--gold2:rgba(255,200,64,0.15);
+  --blue:#00c8ff;--blue2:rgba(0,200,255,0.12);
+  --green:#00e87a;--green2:rgba(0,232,122,0.12);
+  --dim:rgba(180,200,255,0.35);
+  --card:rgba(12,20,44,0.92);
+  --border:rgba(255,255,255,0.07);
+  --r:16px;
+}
+
+/* ── ambient bg ─────────────────────────────────────── */
+body::after{
+  content:'';position:fixed;inset:0;pointer-events:none;z-index:0;
+  background:
+    radial-gradient(ellipse 80% 40% at 50% 0%,  rgba(255,30,50,0.07) 0%,transparent 60%),
+    radial-gradient(ellipse 60% 50% at 10% 80%,  rgba(0,100,220,0.06) 0%,transparent 55%),
+    radial-gradient(ellipse 50% 40% at 90% 30%,  rgba(80,0,200,0.05) 0%,transparent 55%);
+}
+
+/* ── page shell ─────────────────────────────────────── */
+.page{
+  position:relative;z-index:1;
+  max-width:440px;margin:0 auto;
+  padding:18px 12px 24px;
+  display:flex;flex-direction:column;gap:14px;
+}
+
+/* ── header ─────────────────────────────────────────── */
+header{text-align:center}
+.logo{
+  font-family:'Orbitron',monospace;font-weight:900;
+  font-size:clamp(20px,6vw,26px);letter-spacing:.06em;
+  background:linear-gradient(130deg,var(--red) 0%,#ff7040 45%,var(--gold) 100%);
+  -webkit-background-clip:text;-webkit-text-fill-color:transparent;background-clip:text;
+}
+.logo-sub{font-size:11px;letter-spacing:.2em;color:var(--dim);text-transform:uppercase;margin-top:3px}
+.hline{height:1px;background:linear-gradient(90deg,transparent,var(--red),transparent);opacity:.4;margin-top:10px}
+
+/* ── BALL ────────────────────────────────────────────── */
+.ball-stage{
+  display:flex;flex-direction:column;align-items:center;gap:10px;
+  padding:18px 0 10px;
+}
+
+/* outer spinning ring */
+.ball-orbit{
+  width:160px;height:160px;position:relative;
+  display:flex;align-items:center;justify-content:center;
+}
+.ball-orbit::before{
+  content:'';position:absolute;inset:0;border-radius:50%;
+  background:conic-gradient(
+    var(--red) 0deg, #ff6040 60deg, var(--gold) 120deg,
+    transparent 150deg, transparent 210deg,
+    var(--blue) 240deg, var(--red) 360deg
+  );
+  animation:orbitSpin 3s linear infinite;
+}
+.ball-orbit::after{
+  content:'';position:absolute;inset:5px;border-radius:50%;
+  background:#080b12;
+}
+@keyframes orbitSpin{to{transform:rotate(360deg)}}
+
+/* inner ball */
+.ball{
+  position:absolute;inset:12px;border-radius:50%;
+  background:radial-gradient(circle at 38% 32%,#1a3060,#03071a);
+  border:1.5px solid rgba(0,200,255,0.2);
+  display:flex;flex-direction:column;align-items:center;justify-content:center;
+  box-shadow:
+    0 0 30px rgba(255,34,53,0.15),
+    inset 0 0 20px rgba(0,0,0,0.6);
+  z-index:2;overflow:hidden;
+}
+/* shimmer */
+.ball::before{
+  content:'';position:absolute;inset:-20px;
+  background:conic-gradient(transparent 340deg,rgba(255,255,255,0.06) 360deg);
+  animation:orbitSpin 1.8s linear infinite reverse;
+}
+
+.ball-num{
+  font-family:'Orbitron',monospace;font-weight:900;
+  font-size:clamp(38px,12vw,58px);line-height:1;
+  color:#fff;
+  text-shadow:0 0 20px rgba(0,200,255,0.7),0 0 40px rgba(0,200,255,0.3);
+  position:relative;z-index:1;
+  transition:all .25s cubic-bezier(.34,1.56,.64,1);
+  letter-spacing:-.02em;
+}
+.ball-label{
+  font-size:9px;letter-spacing:.18em;color:var(--blue);
+  text-transform:uppercase;position:relative;z-index:1;margin-top:2px;
+}
+
+/* pop animation */
+@keyframes ballPop{
+  0%  {transform:scale(1)}
+  25% {transform:scale(1.12)}
+  50% {transform:scale(.95)}
+  75% {transform:scale(1.04)}
+  100%{transform:scale(1)}
+}
+.ball.pop{animation:ballPop .5s cubic-bezier(.36,.07,.19,.97)}
+
+/* number name below ball */
+.ball-name{
+  font-family:'Barlow Condensed',sans-serif;font-weight:600;
+  font-size:clamp(13px,3.5vw,16px);letter-spacing:.08em;
+  color:var(--gold);text-align:center;
+  min-height:1.4em;text-transform:uppercase;
+  transition:opacity .2s;
+}
+
+/* ── STAT STRIP ──────────────────────────────────────── */
+.stat-strip{
+  display:grid;grid-template-columns:repeat(4,1fr);gap:6px;
+}
+.stat{
+  background:var(--card);border:1px solid var(--border);
+  border-radius:12px;padding:8px 4px;text-align:center;
+}
+.stat-v{
+  font-family:'Orbitron',monospace;font-size:17px;font-weight:700;
+  color:var(--gold);line-height:1;
+}
+.stat-l{font-size:10px;color:var(--dim);text-transform:uppercase;letter-spacing:.08em;margin-top:3px}
+
+/* ── CONTROLS ────────────────────────────────────────── */
+.controls{display:grid;grid-template-columns:1fr 1fr;gap:8px}
+.ctrl{
+  padding:13px 8px;border-radius:14px;border:1px solid;
+  font-family:'Barlow Condensed',sans-serif;font-size:14px;font-weight:700;
+  letter-spacing:.05em;text-transform:uppercase;
+  cursor:pointer;background:rgba(0,0,0,.45);
+  display:flex;align-items:center;justify-content:center;gap:7px;
+  transition:all .15s;
+}
+.ctrl:active{transform:scale(.93);opacity:.8}
+.ctrl-call{border-color:rgba(255,34,53,.5);color:var(--red);box-shadow:0 0 14px rgba(255,34,53,.12)}
+.ctrl-auto{border-color:rgba(255,200,64,.4);color:var(--gold)}
+.ctrl-auto.on{border-color:rgba(255,34,53,.7);color:var(--red);animation:pulseBorder 1.1s ease infinite}
+.ctrl-reset{border-color:rgba(100,120,200,.3);color:#8899cc}
+.ctrl-sound{border-color:rgba(0,200,255,.3);color:var(--blue)}
+@keyframes pulseBorder{0%,100%{box-shadow:0 0 0 0 rgba(255,34,53,0)}50%{box-shadow:0 0 0 4px rgba(255,34,53,.2)}}
+
+/* speed row */
+.speed-row{
+  display:flex;align-items:center;gap:10px;
+  background:var(--card);border:1px solid var(--border);
+  border-radius:12px;padding:10px 14px;
+}
+.speed-label{font-size:12px;color:var(--dim);white-space:nowrap}
+.speed-slider{
+  flex:1;-webkit-appearance:none;appearance:none;
+  height:4px;border-radius:2px;
+  background:linear-gradient(90deg,var(--red),var(--gold));
+  outline:none;
+}
+.speed-slider::-webkit-slider-thumb{
+  -webkit-appearance:none;width:18px;height:18px;border-radius:50%;
+  background:#fff;border:2px solid var(--red);cursor:pointer;
+  box-shadow:0 0 8px rgba(255,34,53,.5);
+}
+.speed-val{
+  font-family:'Orbitron',monospace;font-size:12px;font-weight:700;
+  color:var(--gold);min-width:32px;text-align:right;
+}
+
+/* ── LAST CALLED ─────────────────────────────────────── */
+.history-wrap{
+  background:var(--card);border:1px solid var(--border);
+  border-radius:var(--r);padding:12px;
+}
+.section-title{
+  font-size:10px;letter-spacing:.18em;text-transform:uppercase;
+  color:var(--dim);margin-bottom:9px;display:flex;align-items:center;gap:6px;
+}
+.section-title::after{content:'';flex:1;height:1px;background:var(--border)}
+
+.history-chips{display:flex;flex-wrap:wrap;gap:5px;max-height:80px;overflow:hidden}
+.chip{
+  font-family:'Orbitron',monospace;font-size:10px;font-weight:700;
+  padding:3px 7px;border-radius:5px;
+  background:rgba(0,80,160,.28);border:.5px solid rgba(0,200,255,.2);
+  color:#70b8ff;transition:all .25s;
+}
+.chip.fresh{
+  background:var(--red2);border-color:rgba(255,34,53,.5);
+  color:#ff8899;animation:chipIn .3s cubic-bezier(.34,1.56,.64,1);
+}
+@keyframes chipIn{from{transform:scale(.5);opacity:0}to{transform:scale(1);opacity:1}}
+
+/* ── NUMBER BOARD ────────────────────────────────────── */
+.board-wrap{
+  background:var(--card);border:1px solid var(--border);
+  border-radius:var(--r);padding:12px;
+}
+.num-board{
+  display:grid;grid-template-columns:repeat(9,1fr);gap:3px;width:100%;
+}
+.nb{
+  aspect-ratio:1;min-width:0;border-radius:5px;
+  display:flex;align-items:center;justify-content:center;
+  font-family:'Orbitron',monospace;
+  font-size:clamp(7px,2vw,10.5px);font-weight:700;
+  color:rgba(150,170,220,.22);
+  background:rgba(255,255,255,.03);
+  border:.5px solid transparent;
+  transition:all .3s;
+}
+.nb.on{
+  color:var(--blue);background:rgba(0,100,200,.35);
+  border-color:rgba(0,200,255,.3);
+  box-shadow:0 0 6px rgba(0,200,255,.18);
+}
+.nb.latest{
+  color:#fff;background:var(--red);
+  border-color:rgba(255,34,53,.8);
+  box-shadow:0 0 10px rgba(255,34,53,.5);
+  animation:nbFlash .5s ease;
+}
+@keyframes nbFlash{0%,100%{transform:scale(1)}40%{transform:scale(1.25)}70%{transform:scale(.92)}}
+
+/* ── WIN TOAST ───────────────────────────────────────── */
+.toasts{position:fixed;top:16px;left:50%;transform:translateX(-50%);z-index:999;display:flex;flex-direction:column;gap:7px;width:90%;max-width:360px;pointer-events:none}
+.toast{
+  border-radius:12px;padding:11px 16px;
+  font-weight:700;font-size:13px;letter-spacing:.04em;
+  text-align:center;backdrop-filter:blur(12px);
+  animation:toastIn .4s cubic-bezier(.34,1.56,.64,1),toastOut .35s ease 3.5s forwards;
+  pointer-events:none;
+}
+@keyframes toastIn{from{transform:translateY(-20px) scale(.9);opacity:0}to{transform:none;opacity:1}}
+@keyframes toastOut{to{transform:translateY(-10px) scale(.95);opacity:0}}
+.toast-info{background:rgba(0,100,200,.85);border:1px solid rgba(0,200,255,.4);color:#e0f4ff}
+.toast-win {background:rgba(0,180,80,.85);border:1px solid rgba(0,232,122,.5);color:#d0fff0}
+.toast-mega{background:rgba(200,20,40,.9);border:1px solid rgba(255,100,120,.5);color:#fff}
+
+/* ── VOICE PANEL ─────────────────────────────────────── */
+.voice-row{
+  display:flex;align-items:center;gap:8px;
+  background:var(--card);border:1px solid var(--border);
+  border-radius:12px;padding:10px 14px;
+}
+.voice-row label{font-size:12px;color:var(--dim);flex:1}
+.voice-select{
+  background:#0a1428;border:1px solid rgba(0,200,255,.25);
+  color:#e0eeff;border-radius:8px;padding:5px 8px;font-size:12px;
+  font-family:'Barlow',sans-serif;flex:1;max-width:160px;outline:none;
+}
+.voice-test{
+  background:var(--red2);border:1px solid rgba(255,34,53,.35);
+  color:var(--red);border-radius:8px;padding:5px 10px;
+  font-size:12px;font-family:'Barlow Condensed',sans-serif;
+  font-weight:700;letter-spacing:.05em;cursor:pointer;
+  transition:all .15s;white-space:nowrap;
+}
+.voice-test:active{transform:scale(.93)}
+
+/* confetti */
+.cf{position:fixed;width:8px;height:8px;border-radius:2px;pointer-events:none;z-index:9999}
+</style>
+</head>
+<body>
+
+<div class="toasts" id="toasts"></div>
+
+<div class="page">
+
+  <!-- HEADER -->
+  <header>
+    <div class="logo">TAMBOLA CALLER</div>
+    <div class="logo-sub">Premium Number Caller System</div>
+    <div class="hline"></div>
+  </header>
+
+  <!-- BALL -->
+  <div class="ball-stage">
+    <div class="ball-orbit">
+      <div class="ball" id="ball">
+        <div class="ball-num" id="ballNum">—</div>
+        <div class="ball-label">CALLED</div>
+      </div>
+    </div>
+    <div class="ball-name" id="ballName">Ready to play</div>
+  </div>
+
+  <!-- STATS -->
+  <div class="stat-strip">
+    <div class="stat"><div class="stat-v" id="sCalled">0</div><div class="stat-l">Called</div></div>
+    <div class="stat"><div class="stat-v" id="sLeft">90</div><div class="stat-l">Left</div></div>
+    <div class="stat"><div class="stat-v" id="sLast">—</div><div class="stat-l">Last</div></div>
+    <div class="stat"><div class="stat-v" id="sPrev">—</div><div class="stat-l">Before</div></div>
+  </div>
+
+  <!-- CONTROLS -->
+  <div class="controls">
+    <button class="ctrl ctrl-call" id="btnCall" onclick="callOne()">
+      <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round"><circle cx="12" cy="12" r="10"/><circle cx="12" cy="12" r="4"/></svg>
+      Call Number
+    </button>
+    <button class="ctrl ctrl-auto" id="btnAuto" onclick="toggleAuto()">
+      <svg id="autoIco" width="16" height="16" viewBox="0 0 24 24" fill="currentColor"><polygon points="5,3 19,12 5,21"/></svg>
+      <span id="autoLbl">Auto Call</span>
+    </button>
+    <button class="ctrl ctrl-sound" id="btnSound" onclick="toggleSound()">
+      <svg id="sndIco" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><polygon points="11,5 6,9 2,9 2,15 6,15 11,19"/><path d="M15.54 8.46a5 5 0 0 1 0 7.07"/><path d="M19.07 4.93a10 10 0 0 1 0 14.14"/></svg>
+      <span id="sndLbl">Sound On</span>
+    </button>
+    <button class="ctrl ctrl-reset" onclick="resetGame()">
+      <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round"><polyline points="1 4 1 10 7 10"/><path d="M3.51 15a9 9 0 1 0 .49-4"/></svg>
+      Reset
+    </button>
+  </div>
+
+  <!-- SPEED -->
+  <div class="speed-row">
+    <span class="speed-label">Auto speed</span>
+    <input type="range" class="speed-slider" id="speedSlider" min="10" max="60" value="30" oninput="onSpeed(this.value)">
+    <span class="speed-val" id="speedVal">3.0s</span>
+  </div>
+
+  <!-- VOICE -->
+  <div class="voice-row">
+    <label>Voice</label>
+    <select class="voice-select" id="voiceSelect" onchange="onVoiceChange()"></select>
+    <button class="voice-test" onclick="testVoice()">Test</button>
+  </div>
+
+  <!-- HISTORY -->
+  <div class="history-wrap">
+    <div class="section-title">Recent calls</div>
+    <div class="history-chips" id="histChips"></div>
+  </div>
+
+  <!-- BOARD -->
+  <div class="board-wrap">
+    <div class="section-title">Number board · 1–90</div>
+    <div class="num-board" id="numBoard"></div>
+  </div>
+
+</div><!-- .page -->
+
+<script>
+/* ═══════════════════════════════════════
+   STATE
+═══════════════════════════════════════ */
+let bag       = [];
+let called    = [];
+let autoTimer = null;
+let soundOn   = true;
+let voiceOn   = true;
+let voices    = [];
+let selVoice  = null;
+let autoMs    = 3000;
+
+/* ═══════════════════════════════════════
+   NUMBER NAMES (Tambola lingo)
+═══════════════════════════════════════ */
+const NAMES = {
+  1:'Kelly\'s eye',2:'One little duck',3:'Cup of tea',4:'Knock at the door',
+  5:'Man alive',6:'Half a dozen',7:'Lucky seven',8:'One fat lady',
+  9:'Doctor\'s orders',10:'Theresa\'s den',11:'Legs eleven',12:'One dozen',
+  13:'Unlucky for some',14:'Valentine\'s Day',15:'Young and keen',
+  16:'Sweet sixteen',17:'Dancing queen',18:'Coming of age',19:'Goodbye teens',
+  20:'One score',21:'Royal salute',22:'Two little ducks',23:'The Lord\'s prayer',
+  24:'Two dozen',25:'Duck and dive',26:'Pick and mix',27:'Gateway to heaven',
+  28:'Overweight',29:'Rise and shine',30:'Dirty Gertie',31:'Get up and run',
+  32:'Buckle my shoe',33:'All the threes',34:'Ask for more',35:'Jump and jive',
+  36:'Three dozen',37:'More than eleven',38:'Christmas cake',39:'Steps',
+  40:'Life begins',41:'Time for fun',42:'Winnie the Pooh',43:'Down on your knees',
+  44:'Droopy drawers',45:'Halfway there',46:'Up to tricks',47:'Four and seven',
+  48:'Four dozen',49:'PC',50:'Half century',51:'Tweak of the thumb',
+  52:'Danny La Rue',53:'Stuck in a tree',54:'Clean the floor',55:'Snakes alive',
+  56:'Was she worth it',57:'Heinz varieties',58:'Make them wait',59:'Brighton line',
+  60:'Five dozen',61:'Bakers bun',62:'Turn on the screw',63:'Tickle me',
+  64:'Red raw',65:'Old age pension',66:'Clickety click',67:'Made in heaven',
+  68:'Saving grace',69:'Either way up',70:'Three score and ten',
+  71:'Bang on the drum',72:'Six dozen',73:'Queen bee',74:'Hit the floor',
+  75:'Strive and strive',76:'Trombones',77:'Sunset strip',78:'Heaven\'s gate',
+  79:'One more time',80:'Eight and blank',81:'Stop and run',82:'Straight on through',
+  83:'Time for tea',84:'Seven dozen',85:'Staying alive',86:'Between the sticks',
+  87:'Torquay in Devon',88:'Two fat ladies',89:'Nearly there',90:'Top of the shop',
+};
+
+/* ═══════════════════════════════════════
+   AUDIO (Web Audio API)
+═══════════════════════════════════════ */
+let actx;
+function ac(){ if(!actx) actx=new(window.AudioContext||window.webkitAudioContext)(); return actx; }
+
+function beep(freq=440,type='sine',dur=.12,vol=.22){
+  if(!soundOn) return;
+  try{
+    const c=ac(),o=c.createOscillator(),g=c.createGain();
+    o.connect(g);g.connect(c.destination);
+    o.type=type;o.frequency.value=freq;
+    g.gain.setValueAtTime(vol,c.currentTime);
+    g.gain.exponentialRampToValueAtTime(.001,c.currentTime+dur);
+    o.start();o.stop(c.currentTime+dur);
+  }catch(_){}
+}
+
+function callChime(n){
+  // Rising ping sequence tuned to number range
+  const base=280+n*2.5;
+  [base,base*1.26,base*1.5].forEach((f,i)=>setTimeout(()=>beep(f,'sine',.18,.18),i*90));
+}
+
+function winFanfare(){
+  [523,659,784,1047,1319].forEach((f,i)=>setTimeout(()=>beep(f,'triangle',.28,.25),i*100));
+}
+
+/* ═══════════════════════════════════════
+   SPEECH
+═══════════════════════════════════════ */
+function loadVoices(){
+  voices=speechSynthesis.getVoices().filter(v=>v.lang.startsWith('en'));
+  const sel=document.getElementById('voiceSelect');
+  sel.innerHTML='<option value="-1">🔇 No voice</option>';
+  voices.forEach((v,i)=>{
+    const o=document.createElement('option');
+    o.value=i;o.textContent=v.name.replace(/\s*\(.*\)/,'');
+    sel.appendChild(o);
+  });
+  // pick a decent default
+  const pref=['Google UK','Daniel','Samantha','Google US','Karen'];
+  let best=-1;
+  pref.forEach(name=>{
+    if(best<0){const idx=voices.findIndex(v=>v.name.includes(name));if(idx>=0)best=idx;}
+  });
+  sel.value=best>=0?best:(voices.length?0:-1);
+  selVoice=voices[+sel.value]||null;
+}
+
+if('speechSynthesis' in window){
+  speechSynthesis.onvoiceschanged=loadVoices;
+  setTimeout(loadVoices,400);
+}
+
+function onVoiceChange(){
+  const v=+document.getElementById('voiceSelect').value;
+  selVoice=v>=0?voices[v]:null;
+}
+
+function speak(n){ try {
+  if(!selVoice||!('speechSynthesis' in window)) return;
+  speechSynthesis.cancel();
+  const name=NAMES[n]||'';
+  const text=`${n}. ${name}`;
+  const u=new SpeechSynthesisUtterance(text);
+  u.voice=selVoice;u.rate=.92;u.pitch=1.05;u.volume=1;
+  speechSynthesis.speak(u);
+  } catch(err){ console.warn('[speak] TTS error:',err); }
+}
+
+function testVoice(){
+  speak(7);
+}
+
+/* ═══════════════════════════════════════
+   BOARD
+═══════════════════════════════════════ */
+function buildBoard(){
+  const board=document.getElementById('numBoard');
+  board.innerHTML='';
+  for(let n=1;n<=90;n++){
+    const d=document.createElement('div');
+    d.className='nb';d.id='nb'+n;d.textContent=n;
+    board.appendChild(d);
+  }
+}
+
+function markBoard(n,isLatest){
+  const el=document.getElementById('nb'+n);
+  if(!el) return;
+  el.className='nb '+(isLatest?'latest':'on');
+  if(isLatest) setTimeout(()=>{ if(el.classList.contains('latest')) el.className='nb on'; },600);
+}
+
+/* ═══════════════════════════════════════
+   CALL
+═══════════════════════════════════════ */
+function callOne(){
+  try {
+    if(!bag.length){ toast('All 90 numbers called! Reset to play again.','info'); return; }
+    // demote previous latest
+    const prev=called[called.length-1];
+    if(prev!==undefined){ const el=document.getElementById('nb'+prev); if(el) el.className='nb on'; }
+    const idx=Math.floor(Math.random()*bag.length);
+    const n=bag.splice(idx,1)[0];
+    if(n===undefined){ console.error('[callOne] splice returned undefined'); return; }
+    called.push(n);
+    // ball animation
+    const ball=document.getElementById('ball');
+    if(ball){
+      ball.classList.remove('pop');
+      void ball.offsetWidth;
+      ball.classList.add('pop');
+      ball.style.boxShadow='0 0 40px rgba(255,34,53,.4), inset 0 0 20px rgba(0,0,0,.6)';
+      setTimeout(function(){ if(ball) ball.style.boxShadow='0 0 30px rgba(255,34,53,.15), inset 0 0 20px rgba(0,0,0,.6)'; },500);
+    }
+    const ballNumEl=document.getElementById('ballNum');
+    if(ballNumEl) ballNumEl.textContent=n;
+    const ballNameEl=document.getElementById('ballName');
+    if(ballNameEl) ballNameEl.textContent=NAMES[n]||'';
+    // stats
+    const prev2=called[called.length-2];
+    const sC=document.getElementById('sCalled'); if(sC) sC.textContent=called.length;
+    const sL=document.getElementById('sLeft');   if(sL) sL.textContent=bag.length;
+    const sLa=document.getElementById('sLast');  if(sLa) sLa.textContent=n;
+    const sP=document.getElementById('sPrev');   if(sP) sP.textContent=(prev2!==undefined)?prev2:'—';
+    markBoard(n,true);
+    updateHistory(n);
+    callChime(n);
+    speak(n);
+    if(called.length===5)  toast('⭐ Early Five called!','win');
+    if(called.length===45) toast('Halfway there — 45 called!','info');
+    if(called.length===90){ toast('🎉 Full bag! All 90 numbers called!','mega'); winFanfare(); confetti(); }
+  } catch(err){ console.error('[callOne] Error:',err); }
+}
+
+function updateHistory(n){
+  const strip=document.getElementById('histChips');
+  // remove 'fresh' from previous
+  strip.querySelectorAll('.fresh').forEach(c=>c.classList.remove('fresh'));
+  const chip=document.createElement('span');
+  chip.className='chip fresh';chip.textContent=n;
+  strip.prepend(chip);
+  while(strip.children.length>36) strip.removeChild(strip.lastChild);
+}
+
+/* ═══════════════════════════════════════
+   AUTO
+═══════════════════════════════════════ */
+function toggleAuto(){ try {
+  const btn=document.getElementById('btnAuto');
+  const ico=document.getElementById('autoIco');
+  const lbl=document.getElementById('autoLbl');
+  if(autoTimer){
+    clearInterval(autoTimer);autoTimer=null;
+    btn.classList.remove('on');
+    ico.innerHTML='<polygon points="5,3 19,12 5,21"/>';
+    lbl.textContent='Auto Call';
+  } else {
+    if(!bag.length){ toast('No numbers left. Reset first!','info'); return; }
+    autoTimer=setInterval(()=>{
+      if(!bag.length){ toggleAuto(); return; }
+      callOne();
+    },autoMs);
+    btn.classList.add('on');
+    ico.innerHTML='<rect x="6" y="4" width="4" height="16"/><rect x="14" y="4" width="4" height="16"/>';
+    lbl.textContent='Stop Auto';
+    beep(400,'square',.08,.15);
+  }
+  } catch(err){ console.error('[toggleAuto] Error:',err); }
+}
+
+function onSpeed(v){
+  try {
+    // slider 10 (left/slow=8s) → 60 (right/fast=1s)
+    autoMs = Math.round(8000 - ((+v - 10) / (60 - 10)) * (8000 - 1000));
+    autoMs = Math.max(1000, Math.min(8000, autoMs)); // clamp safety
+    const display = document.getElementById('speedVal');
+    if (display) display.textContent = (autoMs / 1000).toFixed(1) + 's';
+    // restart timer at new rate if already running
+    if (autoTimer) {
+      clearInterval(autoTimer);
+      autoTimer = setInterval(function() {
+        if (!bag.length) { toggleAuto(); return; }
+        callOne();
+      }, autoMs);
+    }
+  } catch(err) {
+    console.error('[onSpeed] Error:', err);
+  }
+}
+// init speed display safely after DOM is ready
+(function initSpeedDisplay() {
+  try {
+    const display = document.getElementById('speedVal');
+    if (display) display.textContent = (autoMs / 1000).toFixed(1) + 's';
+  } catch(err) {
+    console.error('[initSpeedDisplay] Error:', err);
+  }
+})();
+
+/* ═══════════════════════════════════════
+   SOUND TOGGLE
+═══════════════════════════════════════ */
+function toggleSound(){
+  soundOn=!soundOn;
+  const lbl=document.getElementById('sndLbl');
+  const ico=document.getElementById('sndIco');
+  lbl.textContent=soundOn?'Sound On':'Sound Off';
+  ico.innerHTML=soundOn
+    ?'<polygon points="11,5 6,9 2,9 2,15 6,15 11,19"/><path d="M15.54 8.46a5 5 0 0 1 0 7.07"/><path d="M19.07 4.93a10 10 0 0 1 0 14.14"/>'
+    :'<polygon points="11,5 6,9 2,9 2,15 6,15 11,19"/><line x1="23" y1="9" x2="17" y2="15"/><line x1="17" y1="9" x2="23" y2="15"/>';
+}
+
+/* ═══════════════════════════════════════
+   RESET
+═══════════════════════════════════════ */
+function resetGame(){ try {
+  if(autoTimer){ clearInterval(autoTimer);autoTimer=null;
+    document.getElementById('btnAuto').classList.remove('on');
+    document.getElementById('autoIco').innerHTML='<polygon points="5,3 19,12 5,21"/>';
+    document.getElementById('autoLbl').textContent='Auto Call';
+  }
+  bag=Array.from({length:90},(_,i)=>i+1);
+  called=[];
+  document.getElementById('ballNum').textContent='—';
+  document.getElementById('ballName').textContent='Ready to play';
+  document.getElementById('sCalled').textContent='0';
+  document.getElementById('sLeft').textContent='90';
+  document.getElementById('sLast').textContent='—';
+  document.getElementById('sPrev').textContent='—';
+  document.getElementById('histChips').innerHTML='';
+  buildBoard();
+  beep(300,'sine',.12,.18);
+  } catch(err){ console.error('[resetGame] Error:',err); }
+}
+
+/* ═══════════════════════════════════════
+   TOAST
+═══════════════════════════════════════ */
+function toast(msg,type='info'){
+  const box=document.getElementById('toasts');
+  const t=document.createElement('div');
+  t.className='toast toast-'+type;
+  t.textContent=msg;
+  box.appendChild(t);
+  setTimeout(()=>t.remove(),4000);
+}
+
+/* ═══════════════════════════════════════
+   CONFETTI
+═══════════════════════════════════════ */
+function confetti(){
+  const cols=['#ff2235','#00c8ff','#ffc840','#00e87a','#b44dff','#fff'];
+  for(let i=0;i<80;i++){
+    setTimeout(()=>{
+      const el=document.createElement('div');
+      el.className='cf';
+      el.style.cssText=`left:${Math.random()*100}vw;background:${cols[Math.floor(Math.random()*cols.length)]};border-radius:${Math.random()<.5?'50%':'2px'};`;
+      document.body.appendChild(el);
+      el.animate ? el.animate([
+        {transform:'translate(0,0) rotate(0deg)',opacity:1,top:'-12px'},
+        {transform:`translate(${(Math.random()-.5)*300}px,${window.innerHeight+60}px) rotate(${Math.random()*720}deg)`,opacity:0}
+      ],{duration:1800+Math.random()*1200,easing:'cubic-bezier(.25,.46,.45,.94)'})
+      .onfinish=function(){el.remove();} : setTimeout(function(){el.remove();},3000);
+    },i*25);
+  }
+}
+
+/* ═══════════════════════════════════════
+   INIT
+═══════════════════════════════════════ */
+resetGame();
+</script>
+</body>
+</html>
