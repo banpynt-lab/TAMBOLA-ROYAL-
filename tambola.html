@@ -1,0 +1,818 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+<title>Tambola Royale</title>
+<link href="https://fonts.googleapis.com/css2?family=Orbitron:wght@400;700;900&family=Rajdhani:wght@400;500;600;700&display=swap" rel="stylesheet">
+<style>
+/* ── RESET & ROOT ─────────────────────────────────────── */
+*, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; -webkit-tap-highlight-color: transparent; }
+html { font-size: 16px; }
+body {
+  width: 100%; min-height: 100vh; overflow-x: hidden;
+  background: #050a14;
+  font-family: 'Rajdhani', system-ui, sans-serif;
+  color: #ddeeff;
+  -webkit-font-smoothing: antialiased;
+}
+
+/* ── DESIGN TOKENS ───────────────────────────────────── */
+:root {
+  --red:       #ff2233;
+  --red-dim:   rgba(255,34,51,0.18);
+  --red-glow:  rgba(255,34,51,0.35);
+  --blue:      #00c8ff;
+  --blue-dim:  rgba(0,200,255,0.12);
+  --gold:      #ffc840;
+  --green:     #00e87a;
+  --green-dim: rgba(0,232,122,0.15);
+  --purple:    #b44dff;
+
+  /* ticket cell palette */
+  --cell-bg:        #0a1628;
+  --cell-border:    rgba(0,200,255,0.14);
+  --cell-called-bg: rgba(0,80,180,0.55);
+  --cell-called-bd: rgba(0,200,255,0.5);
+  --cell-mark-bg:   rgba(0,220,100,0.22);
+  --cell-mark-bd:   rgba(0,232,122,0.7);
+  --cell-empty-bg:  rgba(255,255,255,0.025);
+
+  --card-bg:   rgba(8,18,38,0.92);
+  --card-bd:   rgba(0,200,255,0.12);
+
+  --r-xl: 20px;
+  --r-lg: 14px;
+  --r-md: 10px;
+  --r-sm: 6px;
+}
+
+/* ── AMBIENT BACKGROUND ──────────────────────────────── */
+body::before {
+  content: ''; position: fixed; inset: 0; pointer-events: none; z-index: 0;
+  background:
+    radial-gradient(ellipse 90% 55% at 15% 0%,   rgba(255,20,40,0.07)  0%, transparent 60%),
+    radial-gradient(ellipse 70% 60% at 85% 90%,   rgba(0,100,220,0.09)  0%, transparent 60%),
+    radial-gradient(ellipse 50% 40% at 50% 40%,   rgba(80,0,180,0.06)  0%, transparent 70%);
+}
+
+/* ── LAYOUT ──────────────────────────────────────────── */
+.app { position: relative; z-index: 1; max-width: 460px; margin: 0 auto; padding: 14px 10px 110px; }
+
+/* ── HEADER ──────────────────────────────────────────── */
+.hdr { text-align: center; padding: 14px 0 12px; }
+.hdr-title {
+  font-family: 'Orbitron', monospace; font-weight: 900;
+  font-size: clamp(20px, 6.5vw, 28px); letter-spacing: 0.05em; line-height: 1;
+  background: linear-gradient(135deg, #ff4455 0%, var(--gold) 55%, var(--blue) 100%);
+  -webkit-background-clip: text; -webkit-text-fill-color: transparent; background-clip: text;
+}
+.hdr-sub { font-size: 10px; letter-spacing: 0.22em; color: rgba(180,210,255,0.4); text-transform: uppercase; margin-top: 4px; }
+.hdr-rule { height: 1px; margin: 10px 0 0; background: linear-gradient(90deg, transparent, var(--red), transparent); opacity: 0.5; }
+
+/* ── CALLER PANEL ────────────────────────────────────── */
+.caller-panel {
+  background: var(--card-bg); border: 1px solid var(--card-bd);
+  border-radius: var(--r-xl); padding: 12px; margin-bottom: 10px;
+  backdrop-filter: blur(16px); -webkit-backdrop-filter: blur(16px);
+}
+.caller-row { display: flex; align-items: center; gap: 12px; margin-bottom: 8px; }
+
+/* The spinning number ball */
+.ball-wrap { flex-shrink: 0; position: relative; width: 70px; height: 70px; }
+.ball-ring {
+  position: absolute; inset: 0; border-radius: 50%;
+  border: 2px solid transparent;
+  background: linear-gradient(#050a14,#050a14) padding-box,
+              conic-gradient(var(--red),var(--blue),var(--red)) border-box;
+  animation: spin 2.4s linear infinite;
+}
+@keyframes spin { to { transform: rotate(360deg); } }
+.ball-inner {
+  position: absolute; inset: 5px; border-radius: 50%;
+  background: radial-gradient(circle at 38% 35%, #0d2040, #010810);
+  display: flex; flex-direction: column; align-items: center; justify-content: center;
+  border: 1px solid rgba(0,200,255,0.15);
+}
+.ball-num {
+  font-family: 'Orbitron', monospace; font-size: 26px; font-weight: 900;
+  color: #fff; line-height: 1;
+  text-shadow: 0 0 12px rgba(0,200,255,0.7);
+  transition: all 0.25s cubic-bezier(.34,1.56,.64,1);
+}
+.ball-label { font-size: 8px; letter-spacing: 0.15em; color: var(--blue); text-transform: uppercase; margin-top: 1px; }
+.ball-wrap.pop .ball-num { animation: numPop 0.38s cubic-bezier(.36,.07,.19,.97); }
+@keyframes numPop {
+  0%   { transform: scale(1); color: #fff; }
+  30%  { transform: scale(1.35); color: var(--blue); text-shadow: 0 0 20px var(--blue); }
+  65%  { transform: scale(0.9); }
+  100% { transform: scale(1); }
+}
+
+/* Stats row beside ball */
+.caller-stats { flex: 1; min-width: 0; }
+.stat-grid { display: grid; grid-template-columns: repeat(3,1fr); gap: 6px; margin-bottom: 8px; }
+.stat-box { background: rgba(0,0,0,0.3); border-radius: var(--r-md); padding: 5px 4px; text-align: center; border: 0.5px solid rgba(255,255,255,0.06); }
+.stat-val { font-family: 'Orbitron', monospace; font-size: 15px; font-weight: 700; color: var(--gold); line-height: 1; }
+.stat-lbl { font-size: 9px; color: rgba(180,210,255,0.45); text-transform: uppercase; letter-spacing: 0.1em; margin-top: 2px; }
+
+/* Called history strip */
+.history-strip { display: flex; flex-wrap: wrap; gap: 4px; max-height: 44px; overflow: hidden; }
+.h-chip {
+  font-family: 'Orbitron', monospace; font-size: 9.5px; font-weight: 700;
+  padding: 2px 5px; border-radius: 4px;
+  background: rgba(0,80,160,0.3); border: 0.5px solid rgba(0,200,255,0.2);
+  color: #80c4ff; transition: all 0.3s;
+}
+.h-chip.fresh { background: var(--red-dim); border-color: rgba(255,34,51,0.5); color: #ff8899; animation: chipIn 0.3s ease; }
+@keyframes chipIn { from { transform: scale(0.6); opacity: 0; } to { transform: scale(1); opacity: 1; } }
+
+/* ── WIN BANNERS ─────────────────────────────────────── */
+.banner {
+  display: none; border-radius: var(--r-lg); padding: 9px 14px;
+  text-align: center; font-weight: 700; font-size: 13px;
+  letter-spacing: 0.05em; margin-bottom: 9px;
+  animation: bannerIn 0.4s cubic-bezier(.34,1.56,.64,1);
+}
+@keyframes bannerIn { from { transform: translateY(-8px) scale(0.95); opacity: 0; } to { transform: none; opacity: 1; } }
+.banner.show { display: block; }
+.banner-e5  { background: rgba(255,200,64,0.12); border: 1px solid rgba(255,200,64,0.4); color: var(--gold); }
+.banner-top { background: var(--blue-dim);         border: 1px solid rgba(0,200,255,0.35); color: var(--blue); }
+.banner-mid { background: var(--red-dim);           border: 1px solid rgba(255,34,51,0.35); color: #ff8899; }
+.banner-fh  { background: var(--green-dim);         border: 1px solid rgba(0,232,122,0.45); color: var(--green); font-size: 15px; }
+
+/* ── TABS ────────────────────────────────────────────── */
+.tabs-wrap { display: flex; gap: 6px; overflow-x: auto; scrollbar-width: none; padding: 2px 0; margin-bottom: 10px; }
+.tabs-wrap::-webkit-scrollbar { display: none; }
+.tab {
+  flex-shrink: 0; padding: 5px 14px; border-radius: 20px;
+  border: 1px solid rgba(255,255,255,0.1); background: rgba(0,0,0,0.3);
+  color: rgba(180,210,255,0.45); font-family: 'Rajdhani', sans-serif;
+  font-size: 12px; font-weight: 600; cursor: pointer; white-space: nowrap;
+  transition: all 0.2s;
+}
+.tab.active {
+  background: var(--red-dim); border-color: rgba(255,34,51,0.5);
+  color: #ff8899; box-shadow: 0 0 12px var(--red-glow);
+}
+.tab:active { transform: scale(0.93); }
+
+/* ── TICKET CARD ─────────────────────────────────────── */
+.ticket-card {
+  background: var(--card-bg); border: 1px solid var(--card-bd);
+  border-radius: var(--r-xl); overflow: hidden;
+  box-shadow: 0 8px 40px rgba(0,0,0,0.55), 0 0 0 0.5px rgba(0,200,255,0.06);
+  margin-bottom: 12px;
+}
+.ticket-top {
+  padding: 8px 12px; display: flex; align-items: center; justify-content: space-between;
+  background: rgba(0,0,0,0.35);
+  border-bottom: 1px solid rgba(0,200,255,0.08);
+}
+.t-id { font-family: 'Orbitron', monospace; font-size: 11px; font-weight: 700; color: var(--red); letter-spacing: 0.08em; }
+.t-meta { display: flex; gap: 10px; }
+.t-meta span { font-size: 11px; color: rgba(180,210,255,0.5); }
+.t-meta strong { color: #ddeeff; }
+
+/* ── THE TICKET GRID — mobile-proof ─────────────────── */
+/*
+  KEY FIXES:
+  1. grid-template-columns: repeat(9, 1fr) — equal columns, no min-content leakage
+  2. width: 100% on grid ensures it fills card, never overflows
+  3. Each cell uses aspect-ratio:1 + overflow:hidden + min-width:0
+  4. Number font uses clamp() + will never exceed cell via transform scale trick
+  5. No fixed px widths anywhere — everything is fractional/relative
+*/
+.t-grid {
+  display: grid;
+  grid-template-columns: repeat(9, 1fr);
+  grid-template-rows: repeat(3, 1fr);
+  gap: clamp(2px, 0.8vw, 5px);
+  padding: clamp(6px, 2vw, 10px);
+  width: 100%;               /* fill the card */
+}
+
+.cell {
+  /* Equal square cells */
+  aspect-ratio: 1 / 1;
+  min-width: 0;              /* CRITICAL: prevents grid blowout */
+  min-height: 0;
+  border-radius: var(--r-sm);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  overflow: hidden;          /* text can NEVER leak out */
+  position: relative;
+  will-change: transform;
+  transition: background 0.22s ease, box-shadow 0.22s ease, transform 0.14s ease;
+}
+
+.cell-empty {
+  background: var(--cell-empty-bg);
+}
+
+.cell-num {
+  background: var(--cell-bg);
+  border: 1px solid var(--cell-border);
+  cursor: pointer;
+  box-shadow: inset 0 1px 0 rgba(255,255,255,0.04);
+}
+.cell-num:active { transform: scale(0.82); }
+
+/* Called state */
+.cell-num.called {
+  background: var(--cell-called-bg);
+  border-color: var(--cell-called-bd);
+  box-shadow: 0 0 8px rgba(0,200,255,0.2), inset 0 0 8px rgba(0,100,200,0.2);
+}
+/* Marked state */
+.cell-num.marked {
+  background: var(--cell-mark-bg);
+  border-color: var(--cell-mark-bd);
+  box-shadow: 0 0 10px rgba(0,232,122,0.3);
+}
+/* Winning row highlight */
+.cell-num.row-win {
+  background: rgba(255,200,64,0.2);
+  border-color: rgba(255,200,64,0.8);
+  box-shadow: 0 0 10px rgba(255,200,64,0.4);
+  animation: rowWin 0.6s ease;
+}
+@keyframes rowWin {
+  0%,100% { box-shadow: 0 0 10px rgba(255,200,64,0.4); }
+  50%      { box-shadow: 0 0 22px rgba(255,200,64,0.8); }
+}
+
+/* The number text inside cell */
+.cell-num .n {
+  /* Fluid sizing: never too big or too small */
+  font-family: 'Orbitron', monospace;
+  font-size: clamp(8px, 2.85vw, 14px);
+  font-weight: 700;
+  color: #c5dcff;
+  line-height: 1;
+  white-space: nowrap;
+  user-select: none;
+  /* Safety net: scale down if somehow too wide */
+  max-width: 100%;
+  display: block;
+  text-align: center;
+}
+.cell-num.called .n  { color: #80d8ff; text-shadow: 0 0 8px rgba(0,200,255,0.6); }
+.cell-num.marked .n  { color: #ffffff; text-shadow: 0 0 8px rgba(0,232,122,0.5); font-weight: 900; }
+.cell-num.row-win .n { color: var(--gold); text-shadow: 0 0 8px rgba(255,200,64,0.6); }
+
+/* Tick mark on marked cells */
+.cell-num.marked::after {
+  content: '✓';
+  position: absolute;
+  top: 1px; right: 2px;
+  font-size: clamp(5px, 1.5vw, 8px);
+  color: var(--green);
+  font-family: sans-serif;
+  line-height: 1;
+}
+
+/* New-call flash */
+.cell-num.flash {
+  animation: cellFlash 0.45s cubic-bezier(.36,.07,.19,.97);
+}
+@keyframes cellFlash {
+  0%   { transform: scale(1); }
+  35%  { transform: scale(1.18); box-shadow: 0 0 14px rgba(0,200,255,0.5); }
+  70%  { transform: scale(0.92); }
+  100% { transform: scale(1); }
+}
+
+/* ── NUMBER BOARD ─────────────────────────────────────── */
+.board-section { margin-bottom: 12px; }
+.section-hdr { font-size: 10px; letter-spacing: 0.18em; text-transform: uppercase; color: rgba(180,210,255,0.35); margin-bottom: 6px; padding-left: 2px; }
+.num-board {
+  display: grid;
+  grid-template-columns: repeat(9, 1fr);
+  gap: clamp(2px, 0.7vw, 4px);
+  width: 100%;
+}
+.nb {
+  aspect-ratio: 1;
+  min-width: 0;
+  border-radius: 5px;
+  display: flex; align-items: center; justify-content: center;
+  font-family: 'Orbitron', monospace;
+  font-size: clamp(6.5px, 1.9vw, 10px);
+  font-weight: 700;
+  color: rgba(180,210,255,0.2);
+  background: rgba(255,255,255,0.03);
+  border: 0.5px solid transparent;
+  overflow: hidden;
+  transition: all 0.25s;
+}
+.nb.nb-on {
+  background: rgba(0,80,180,0.35);
+  border-color: rgba(0,200,255,0.3);
+  color: #70c4ff;
+  box-shadow: 0 0 5px rgba(0,200,255,0.2);
+}
+.nb.nb-new {
+  background: var(--red-dim);
+  border-color: rgba(255,34,51,0.5);
+  color: #ff8899;
+  box-shadow: 0 0 8px var(--red-glow);
+}
+
+/* ── BOTTOM ACTION BAR ───────────────────────────────── */
+.bottom-bar {
+  position: fixed; bottom: 0; left: 50%; transform: translateX(-50%);
+  width: 100%; max-width: 460px;
+  background: rgba(5,10,20,0.95);
+  border-top: 1px solid rgba(0,200,255,0.1);
+  backdrop-filter: blur(20px); -webkit-backdrop-filter: blur(20px);
+  padding: 10px 10px 16px;
+  display: grid; grid-template-columns: repeat(5, 1fr);
+  gap: 6px; z-index: 200;
+}
+.act-btn {
+  padding: 9px 2px; border-radius: var(--r-md);
+  border: 1px solid; font-family: 'Rajdhani', sans-serif;
+  font-size: 11px; font-weight: 700; letter-spacing: 0.03em;
+  cursor: pointer; background: rgba(0,0,0,0.4);
+  display: flex; flex-direction: column; align-items: center; gap: 2px;
+  transition: all 0.15s; backdrop-filter: blur(8px);
+}
+.act-btn:active { transform: scale(0.9); opacity: 0.8; }
+.act-btn .ico { font-size: 19px; line-height: 1.15; }
+.act-btn .lbl { font-size: 10px; line-height: 1; }
+
+.ab-call   { border-color: rgba(0,232,122,0.4);   color: var(--green);  }
+.ab-auto   { border-color: rgba(255,200,64,0.4);   color: var(--gold);   }
+.ab-auto.on{ border-color: rgba(255,34,51,0.6);    color: var(--red); animation: pulseBorder 1.2s ease infinite; }
+.ab-add    { border-color: rgba(0,200,255,0.35);   color: var(--blue);   }
+.ab-sound  { border-color: rgba(180,77,255,0.35);  color: var(--purple); }
+.ab-reset  { border-color: rgba(255,80,80,0.3);    color: #ff7070;       }
+
+@keyframes pulseBorder {
+  0%,100% { box-shadow: 0 0 0 0 rgba(255,34,51,0); }
+  50%      { box-shadow: 0 0 0 3px rgba(255,34,51,0.3); }
+}
+
+/* ── CONFETTI ─────────────────────────────────────────── */
+.cfpiece { position: fixed; width: 9px; height: 9px; border-radius: 2px; pointer-events: none; z-index: 9999; top: -12px; }
+
+/* ── UTILITY ─────────────────────────────────────────── */
+.sr-only { position: absolute; width: 1px; height: 1px; overflow: hidden; clip: rect(0,0,0,0); }
+
+/* Small screen tweaks (≤360px) */
+@media (max-width: 360px) {
+  .app { padding-left: 8px; padding-right: 8px; }
+  .caller-panel { padding: 10px; }
+  .bottom-bar { padding: 8px 8px 14px; gap: 4px; }
+}
+</style>
+</head>
+<body>
+<h1 class="sr-only">Tambola Royale — Housie Mobile Game</h1>
+
+<div class="app">
+
+  <!-- HEADER -->
+  <header class="hdr">
+    <div class="hdr-title">TAMBOLA ROYALE</div>
+    <div class="hdr-sub">Premium Housie · Mobile Edition</div>
+    <div class="hdr-rule"></div>
+  </header>
+
+  <!-- CALLER PANEL -->
+  <div class="caller-panel">
+    <div class="caller-row">
+      <div class="ball-wrap" id="ballWrap">
+        <div class="ball-ring"></div>
+        <div class="ball-inner">
+          <div class="ball-num" id="ballNum">—</div>
+          <div class="ball-label">CALLED</div>
+        </div>
+      </div>
+      <div class="caller-stats">
+        <div class="stat-grid">
+          <div class="stat-box"><div class="stat-val" id="sCalled">0</div><div class="stat-lbl">Called</div></div>
+          <div class="stat-box"><div class="stat-val" id="sLeft">90</div><div class="stat-lbl">Left</div></div>
+          <div class="stat-box"><div class="stat-val" id="sMarked">0</div><div class="stat-lbl">Marked</div></div>
+        </div>
+        <div class="history-strip" id="histStrip"></div>
+      </div>
+    </div>
+  </div>
+
+  <!-- WIN BANNERS -->
+  <div class="banner banner-e5"  id="bE5">⭐ EARLY 5 — First five marked!</div>
+  <div class="banner banner-top" id="bTop">🔷 TOP ROW WINNER!</div>
+  <div class="banner banner-mid" id="bMid">🔴 MIDDLE ROW WINNER!</div>
+  <div class="banner banner-fh"  id="bFH">🎉 FULL HOUSE — YOU WIN!</div>
+
+  <!-- TICKET TABS -->
+  <div class="tabs-wrap" id="tabsWrap"></div>
+
+  <!-- TICKET DISPLAY -->
+  <div id="ticketArea"></div>
+
+  <!-- NUMBER BOARD -->
+  <div class="board-section">
+    <div class="section-hdr">Number Board · 1 – 90</div>
+    <div class="num-board" id="numBoard"></div>
+  </div>
+
+</div><!-- .app -->
+
+<!-- BOTTOM ACTION BAR -->
+<nav class="bottom-bar" aria-label="Game controls">
+  <button class="act-btn ab-call"  onclick="callOne()">  <span class="ico">🎱</span><span class="lbl">Call</span></button>
+  <button class="act-btn ab-auto"  onclick="toggleAuto()" id="autoBtn"><span class="ico">▶️</span><span class="lbl">Auto</span></button>
+  <button class="act-btn ab-add"   onclick="addTicket()"> <span class="ico">➕</span><span class="lbl">Ticket</span></button>
+  <button class="act-btn ab-sound" onclick="toggleSound()" id="sndBtn"><span class="ico">🔊</span><span class="lbl">Sound</span></button>
+  <button class="act-btn ab-reset" onclick="resetGame()"> <span class="ico">🔄</span><span class="lbl">Reset</span></button>
+</nav>
+
+<script>
+/* ═══════════════════════════════════════════════════════
+   STATE
+═══════════════════════════════════════════════════════ */
+let tickets   = [];        // [{grid, marked:Set}]
+let active    = 0;
+let bag       = [];        // remaining numbers to call
+let called    = new Set();
+let autoTimer = null;
+let soundOn   = true;
+let wins      = { e5:false, top:false, mid:false, fh:false };
+let AudioCtx  = window.AudioContext || window.webkitAudioContext;
+let actx;
+
+/* ═══════════════════════════════════════════════════════
+   HELPERS
+═══════════════════════════════════════════════════════ */
+const r = (lo,hi) => Array.from({length:hi-lo+1},(_,i)=>lo+i);
+function shuffle(a){ for(let i=a.length-1;i>0;i--){const j=Math.floor(Math.random()*(i+1));[a[i],a[j]]=[a[j],a[i]];}return a; }
+const $  = id => document.getElementById(id);
+
+/* ═══════════════════════════════════════════════════════
+   AUDIO
+═══════════════════════════════════════════════════════ */
+function ctx(){ if(!actx) actx=new AudioCtx(); return actx; }
+function beep(freq,type='sine',dur=0.12,vol=0.22){
+  if(!soundOn) return;
+  try{
+    const c=ctx(), o=c.createOscillator(), g=c.createGain();
+    o.connect(g); g.connect(c.destination);
+    o.type=type; o.frequency.value=freq;
+    g.gain.setValueAtTime(vol,c.currentTime);
+    g.gain.exponentialRampToValueAtTime(0.001,c.currentTime+dur);
+    o.start(); o.stop(c.currentTime+dur);
+  }catch(_){}
+}
+function callBeep(n){ beep(280+n*2.8,'sine',0.14,0.2); }
+function markBeep(){ beep(520,'triangle',0.1,0.18); }
+function winFanfare(){ [523,659,784,1047].forEach((f,i)=>setTimeout(()=>beep(f,'triangle',0.28,0.28),i*110)); }
+
+/* ═══════════════════════════════════════════════════════
+   TICKET GENERATION — robust, verified
+═══════════════════════════════════════════════════════ */
+const COL_RANGES = [[1,9],[10,19],[20,29],[30,39],[40,49],[50,59],[60,69],[70,79],[80,90]];
+
+function generateTicket(){
+  for(let attempt=0; attempt<300; attempt++){
+    const g = tryGen();
+    if(g) return g;
+  }
+  console.error('Ticket generation failed after 300 attempts');
+  return null;
+}
+
+function tryGen(){
+  // grid[row][col] — 3 rows, 9 cols
+  const grid = Array.from({length:3}, ()=>new Array(9).fill(0));
+  const rowCnt = [0,0,0];
+
+  // Phase 1: assign numbers randomly
+  for(let ci=0; ci<9; ci++){
+    const [lo,hi] = COL_RANGES[ci];
+    const pool = shuffle(r(lo,hi));
+    // eligible rows: those still needing numbers
+    const elig = [0,1,2].filter(ri => rowCnt[ri] < 5);
+    if(!elig.length) continue;
+    // columns 0-2 get 1 number; others randomly 1 or 2
+    const want = Math.min(elig.length, pool.length, (ci>=3 && elig.length>=2 && Math.random()<0.38) ? 2 : 1);
+    const chosen = shuffle([...elig]).slice(0, want);
+    chosen.forEach((ri,i)=>{ grid[ri][ci]=pool[i]; rowCnt[ri]++; });
+  }
+
+  // Phase 2: top up rows that still need numbers
+  for(let ri=0; ri<3; ri++){
+    let safety=0;
+    while(rowCnt[ri]<5 && safety++<20){
+      // find a column with room that this row hasn't used
+      const candidates = [];
+      for(let ci=0; ci<9; ci++){
+        if(grid[ri][ci]!==0) continue;
+        const [lo,hi]=COL_RANGES[ci];
+        const usedInCol = new Set([grid[0][ci],grid[1][ci],grid[2][ci]].filter(Boolean));
+        const pool2 = r(lo,hi).filter(n=>!usedInCol.has(n));
+        if(pool2.length) candidates.push({ci,pool:pool2});
+      }
+      if(!candidates.length) return null; // dead end
+      const {ci,pool:p} = candidates[Math.floor(Math.random()*candidates.length)];
+      grid[ri][ci] = p[Math.floor(Math.random()*p.length)];
+      rowCnt[ri]++;
+    }
+  }
+
+  // Validation
+  const flat = grid.flat().filter(Boolean);
+  if(flat.length!==15) return null;
+  if(new Set(flat).size!==15) return null;
+  if(rowCnt.some(c=>c!==5)) return null;
+  return grid;
+}
+
+/* ═══════════════════════════════════════════════════════
+   RENDER
+═══════════════════════════════════════════════════════ */
+function render(){
+  renderTabs();
+  renderTicket();
+  renderBoard();
+  renderStats();
+}
+
+function renderTabs(){
+  const wrap = $('tabsWrap');
+  wrap.innerHTML = '';
+  tickets.forEach((_,i)=>{
+    const b = document.createElement('button');
+    b.className = 'tab' + (i===active?' active':'');
+    b.textContent = `Ticket ${i+1}`;
+    b.onclick = ()=>{ active=i; render(); };
+    wrap.appendChild(b);
+  });
+}
+
+function renderTicket(){
+  const area = $('ticketArea');
+  if(!tickets.length){ area.innerHTML=''; return; }
+
+  const t    = tickets[active];
+  const nums = new Set(t.grid.flat().filter(Boolean));
+  const marked = t.marked;
+  const markedOnTicket = [...marked].filter(n=>nums.has(n)).length;
+  const calledOnTicket = [...called].filter(n=>nums.has(n)).length;
+
+  // Build card HTML
+  const card = document.createElement('div');
+  card.className = 'ticket-card';
+  card.innerHTML = `
+    <div class="ticket-top">
+      <span class="t-id">🎫 TICKET ${active+1}</span>
+      <div class="t-meta">
+        <span>Marked <strong>${markedOnTicket}/15</strong></span>
+        <span>Called <strong>${calledOnTicket}</strong></span>
+      </div>
+    </div>
+    <div class="t-grid" id="tGrid"></div>`;
+  area.innerHTML = '';
+  area.appendChild(card);
+
+  const grid = $('tGrid');
+
+  // Check winning rows for highlight
+  const winRows = getWinningRows(t);
+
+  t.grid.forEach((row, ri)=>{
+    row.forEach((val, ci)=>{
+      const cell = document.createElement('div');
+      if(val===0){
+        cell.className='cell cell-empty';
+      } else {
+        const isCalled = called.has(val);
+        const isMark   = marked.has(val);
+        const isWinRow = winRows.has(ri);
+        let cls = 'cell cell-num';
+        if(isMark)         cls += ' marked';
+        else if(isCalled)  cls += ' called';
+        if(isWinRow&&isMark) cls += ' row-win';
+
+        cell.className = cls;
+        const n = document.createElement('span');
+        n.className = 'n';
+        n.textContent = val;
+        cell.appendChild(n);
+        cell.addEventListener('click', ()=>tapCell(t, val, cell));
+        cell.addEventListener('touchstart', ()=>{}, {passive:true}); // enable hardware accel
+      }
+      grid.appendChild(cell);
+    });
+  });
+}
+
+function getWinningRows(t){
+  const result = new Set();
+  t.grid.forEach((row,ri)=>{
+    const nums = row.filter(Boolean);
+    if(nums.length && nums.every(n=>t.marked.has(n))) result.add(ri);
+  });
+  return result;
+}
+
+function renderBoard(){
+  const board = $('numBoard');
+  board.innerHTML='';
+  for(let n=1;n<=90;n++){
+    const d=document.createElement('div');
+    d.className='nb'+(called.has(n)?' nb-on':'');
+    d.textContent=n;
+    board.appendChild(d);
+  }
+}
+
+function renderStats(){
+  $('sCalled').textContent = called.size;
+  $('sLeft').textContent   = 90 - called.size;
+  if(tickets.length){
+    const t = tickets[active];
+    const nums = new Set(t.grid.flat().filter(Boolean));
+    const m = [...t.marked].filter(n=>nums.has(n)).length;
+    $('sMarked').textContent = m;
+  } else {
+    $('sMarked').textContent = 0;
+  }
+}
+
+function updateHistStrip(latest){
+  const strip = $('histStrip');
+  // Mark old fresh chip as normal
+  strip.querySelectorAll('.fresh').forEach(c=>c.classList.remove('fresh'));
+  // Prepend new chip
+  const chip = document.createElement('span');
+  chip.className='h-chip fresh';
+  chip.textContent=latest;
+  strip.prepend(chip);
+  // Keep max 30 chips
+  while(strip.children.length>30) strip.removeChild(strip.lastChild);
+}
+
+/* ═══════════════════════════════════════════════════════
+   ACTIONS
+═══════════════════════════════════════════════════════ */
+function addTicket(){
+  const g = generateTicket();
+  if(!g){ alert('Could not generate a valid ticket. Please try again.'); return; }
+  tickets.push({ grid:g, marked:new Set() });
+  active = tickets.length-1;
+  render();
+  beep(600,'sine',0.1);
+}
+
+function tapCell(t, val, cell){
+  if(!called.has(val)) return; // only mark called numbers
+  if(t.marked.has(val)) t.marked.delete(val);
+  else { t.marked.add(val); markBeep(); }
+  render();
+  checkWins();
+}
+
+function callOne(){
+  if(!bag.length){ alert('All 90 numbers called! Press Reset to restart.'); return; }
+  const idx = Math.floor(Math.random()*bag.length);
+  const n   = bag.splice(idx,1)[0];
+  called.add(n);
+
+  // Auto-mark on ALL tickets
+  tickets.forEach(t=>{
+    const nums = new Set(t.grid.flat().filter(Boolean));
+    if(nums.has(n)) t.marked.add(n);
+  });
+
+  // Update UI
+  $('ballNum').textContent = n;
+  const bw = $('ballWrap');
+  bw.classList.remove('pop');
+  void bw.offsetWidth;
+  bw.classList.add('pop');
+
+  callBeep(n);
+  updateHistStrip(n);
+
+  // Flash on num board
+  render();
+  const nbCells = $('numBoard').children;
+  if(nbCells[n-1]){ nbCells[n-1].classList.add('nb-new'); setTimeout(()=>nbCells[n-1]?.classList.remove('nb-new'),600); }
+
+  // Flash matching cell on active ticket
+  const tGrid = $('tGrid');
+  if(tGrid){
+    tGrid.querySelectorAll('.cell-num').forEach(cell=>{
+      if(cell.querySelector('.n')?.textContent==n){ cell.classList.add('flash'); setTimeout(()=>cell.classList.remove('flash'),500); }
+    });
+  }
+
+  checkWins();
+}
+
+function toggleAuto(){
+  const btn = $('autoBtn');
+  if(autoTimer){
+    clearInterval(autoTimer); autoTimer=null;
+    btn.classList.remove('on');
+    btn.querySelector('.ico').textContent='▶️';
+    btn.querySelector('.lbl').textContent='Auto';
+  } else {
+    autoTimer = setInterval(()=>{ if(!bag.length){ toggleAuto(); return; } callOne(); }, 2200);
+    btn.classList.add('on');
+    btn.querySelector('.ico').textContent='⏸️';
+    btn.querySelector('.lbl').textContent='Stop';
+  }
+}
+
+function toggleSound(){
+  soundOn=!soundOn;
+  const btn=$('sndBtn');
+  btn.querySelector('.ico').textContent=soundOn?'🔊':'🔇';
+  btn.querySelector('.lbl').textContent=soundOn?'Sound':'Mute';
+}
+
+function resetGame(){
+  if(autoTimer){ clearInterval(autoTimer); autoTimer=null; }
+  const ab=$('autoBtn');
+  ab.classList.remove('on');
+  ab.querySelector('.ico').textContent='▶️';
+  ab.querySelector('.lbl').textContent='Auto';
+
+  bag   = r(1,90);
+  called= new Set();
+  wins  = {e5:false,top:false,mid:false,fh:false};
+  tickets.forEach(t=>t.marked=new Set());
+
+  $('ballNum').textContent='—';
+  $('histStrip').innerHTML='';
+  ['bE5','bTop','bMid','bFH'].forEach(id=>$($(' '+id).trim().slice(1)).classList.remove('show'));
+  ['bE5','bTop','bMid','bFH'].forEach(id=>$(id).classList.remove('show'));
+  render();
+}
+
+/* ═══════════════════════════════════════════════════════
+   WIN DETECTION
+═══════════════════════════════════════════════════════ */
+function checkWins(){
+  if(!tickets.length) return;
+  const t    = tickets[active];
+  const grid = t.grid;
+  const mk   = t.marked;
+  const nums = grid.flat().filter(Boolean);
+
+  // Early 5
+  if(!wins.e5 && nums.filter(n=>mk.has(n)).length>=5){
+    wins.e5=true; show('bE5'); winFanfare();
+  }
+  // Top row
+  if(!wins.top){
+    const top=grid[0].filter(Boolean);
+    if(top.length && top.every(n=>mk.has(n))){ wins.top=true; show('bTop'); winFanfare(); }
+  }
+  // Middle row
+  if(!wins.mid){
+    const mid=grid[1].filter(Boolean);
+    if(mid.length && mid.every(n=>mk.has(n))){ wins.mid=true; show('bMid'); winFanfare(); }
+  }
+  // Full house
+  if(!wins.fh && nums.length===15 && nums.every(n=>mk.has(n))){
+    wins.fh=true; show('bFH'); winFanfare(); confetti();
+  }
+}
+
+function show(id){ $(id).classList.add('show'); }
+
+/* ═══════════════════════════════════════════════════════
+   CONFETTI
+═══════════════════════════════════════════════════════ */
+function confetti(){
+  const cols=['#ff2233','#00c8ff','#ffc840','#00e87a','#b44dff','#ffffff'];
+  for(let i=0;i<70;i++){
+    setTimeout(()=>{
+      const el=document.createElement('div');
+      el.className='cfpiece';
+      el.style.cssText=`left:${Math.random()*100}vw;background:${cols[Math.floor(Math.random()*cols.length)]};border-radius:${Math.random()<0.5?'50%':'2px'};`;
+      document.body.appendChild(el);
+      const tx=(Math.random()-0.5)*260, ty=window.innerHeight+60, rot=Math.random()*720;
+      el.animate([
+        {transform:`translate(0,0) rotate(0deg)`, opacity:1},
+        {transform:`translate(${tx}px,${ty}px) rotate(${rot}deg)`, opacity:0}
+      ], {duration:1800+Math.random()*1200, easing:'cubic-bezier(.25,.46,.45,.94)'})
+      .onfinish=()=>el.remove();
+    }, i*28);
+  }
+}
+
+/* ═══════════════════════════════════════════════════════
+   INIT
+═══════════════════════════════════════════════════════ */
+bag = r(1,90);
+addTicket(); // start with one ticket
+</script>
+</body>
+</html>
